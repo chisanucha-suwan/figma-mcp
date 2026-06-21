@@ -1,0 +1,13 @@
+node_modules/
+build/
+*.log
+.env
+.env.*
+
+# Local Figma data — may contain internal design info; never commit
+figma.code-connect.json
+figma.variables.json
+figma-exports/
+
+# Internal planning/design docs — not for publication
+docs/
