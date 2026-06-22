@@ -79,6 +79,55 @@ On Windows, use forward slashes (`D:/...`) or escaped backslashes (`D:\\...`) in
 | `FIGMA_CODE_CONNECT_PATH` | no       | `./figma.code-connect.json` | Where the local Code Connect map lives           |
 | `FIGMA_VARIABLES_PATH`    | no       | —                           | Local variables JSON (DTCG or raw Figma export)  |
 | `FIGMA_OUTPUT_DIR`        | no       | `./figma-exports`           | Output directory for `export_image`              |
+| `FIGMA_MAX_RETRIES`       | no       | `5`                         | Retries after a `429` before giving up           |
+| `FIGMA_BASE_DELAY_MS`     | no       | `1000`                      | Base backoff delay (ms); doubles each retry      |
+| `FIGMA_CACHE_ENABLED`     | no       | `true`                      | Cache API responses on disk to avoid repeat `429`s |
+| `FIGMA_CACHE_TTL_MS`      | no       | `900000`                    | How long a cached response stays fresh (15 min)  |
+| `FIGMA_MAX_STALE_MS`      | no       | `86400000`                  | Max age a cached copy may be served on a `429` (24h) |
+| `FIGMA_CACHE_DIR`         | no       | `./.figma-cache`            | On-disk cache dir (CWD-relative; git-ignored)    |
+
+Provide these in your MCP client's `env` block (preferred — the token stays out
+of the repo). For local standalone runs or integration tests you can instead copy
+`.env.example` to `.env` and fill it in; it's loaded on startup via `dotenv` and
+is git-ignored. `dotenv` never overrides a variable already set by the MCP client,
+so an MCP-supplied token always wins.
+
+### Rate limits & retries
+
+This server has its **own** rate-limit quota (tied to your token), separate from
+Figma's official Dev Mode MCP plugin — so it keeps working when the plugin is
+throttled. Figma doesn't publish hard limits; it returns `429` with an optional
+`Retry-After` header, which the client handles automatically:
+
+- If `Retry-After` is present, it waits exactly that long.
+- Otherwise it backs off exponentially: `FIGMA_BASE_DELAY_MS * 2^attempt`.
+- It gives up after `FIGMA_MAX_RETRIES` and throws.
+
+With the defaults (`5` / `1000`), a sustained `429` is retried after roughly
+1s, 2s, 4s, 8s (~15s total) before failing. Raise `FIGMA_MAX_RETRIES` if you hit
+limits often.
+
+### Response cache
+
+Repeated reads of the same file are the main `429` driver, so responses are cached
+on disk (enabled by default). Three layers keep reads working under a rate limit:
+
+1. **Fresh cache** — a request seen within `FIGMA_CACHE_TTL_MS` is served from
+   `FIGMA_CACHE_DIR` with no API call. The cache survives restarts (the MCP server is
+   restarted per client session), so a frozen file is fetched once and reused.
+2. **Retry + backoff** — transient `429`s are retried as above.
+3. **Serve-stale on `429`** — if a refetch is rate-limited but a cached copy exists and is
+   within `FIGMA_MAX_STALE_MS` (24h), the stale copy is served, with a `⚠ STALE DATA …` warning
+   prepended to the tool result (and logged to stderr). Beyond that age, a `FigmaError` is thrown
+   whose message points to the official Figma MCP plugin as a fallback (it reads the open desktop
+   file without consuming REST quota).
+
+Notes:
+- **Image renders (`export_image`) are never cached** — their URLs expire, so a cached copy
+  could be a dead link.
+- The cache dir is **CWD-relative**; the MCP client sets CWD, which is often not the project
+  dir. The resolved absolute path is logged on startup — set `FIGMA_CACHE_DIR` to pin it.
+- Force fresh data by setting a short `FIGMA_CACHE_TTL_MS`, or `FIGMA_CACHE_ENABLED=false`.
 
 ### Quick check
 

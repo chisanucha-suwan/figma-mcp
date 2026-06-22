@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { FigmaClient } from "../figma-client.js";
-import { text } from "./util.js";
+import { text, staleNotice } from "./util.js";
 
 // "DocType=Z100, PartnerType=Corporate" -> { DocType: "Z100", PartnerType: "Corporate" }
 export function parseVariantName(name: string): Record<string, string> {
@@ -20,7 +20,7 @@ export function registerComponentTools(server: McpServer, client: FigmaClient) {
     async ({ fileKey }) => {
       const data = (await client.getFileComponents(fileKey)) as any;
       const comps = (data.meta?.components ?? []).map((c: any) => ({ key: c.key, name: c.name, nodeId: c.node_id, componentSetId: c.containing_frame?.nodeId }));
-      return text(comps);
+      return text(comps, staleNotice(client));
     }
   );
 
@@ -51,7 +51,7 @@ export function registerComponentTools(server: McpServer, client: FigmaClient) {
         nodeId: s.node_id,
         variantAxes: Object.fromEntries(Object.entries(axesBySet[s.node_id] ?? {}).map(([k, set]) => [k, [...set]])),
       }));
-      return text(out);
+      return text(out, staleNotice(client));
     }
   );
 }

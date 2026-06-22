@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { FigmaClient } from "../figma-client.js";
-import { text } from "./util.js";
+import { text, staleNotice } from "./util.js";
 import { parseFigmaUrl } from "../url.js";
 
 export function registerMiscTools(server: McpServer, client: FigmaClient) {
@@ -23,7 +23,7 @@ export function registerMiscTools(server: McpServer, client: FigmaClient) {
         created_at: c.created_at,
         resolved_at: c.resolved_at,
       }));
-      return text({ comments });
+      return text({ comments }, staleNotice(client));
     }
   );
 }

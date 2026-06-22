@@ -3,11 +3,15 @@ build/
 *.log
 .env
 .env.*
+!.env.example
 
 # Local Figma data — may contain internal design info; never commit
 figma.code-connect.json
 figma.variables.json
 figma-exports/
+
+# Cached Figma API responses (rate-limit avoidance) — local, may contain design data
+.figma-cache/
 
 # Internal planning/design docs — not for publication
 docs/

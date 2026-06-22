@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { FigmaClient } from "../figma-client.js";
-import { text } from "./util.js";
+import { text, staleNotice } from "./util.js";
 import { stylesToTokens } from "../tokens.js";
 import { existsSync, readFileSync } from "node:fs";
 import { normalizeVariables } from "../variables.js";
@@ -18,11 +18,11 @@ export function registerTokenTools(server: McpServer, client: FigmaClient, varia
       const stylesResp = (await client.getFileStyles(fileKey)) as any;
       const styles = stylesResp.meta?.styles ?? [];
       const ids = styles.map((s: any) => s.node_id);
-      if (ids.length === 0) return text([]);
+      if (ids.length === 0) return text([], staleNotice(client));
       const nodesResp = (await client.getNodes(fileKey, ids, { depth: 1 })) as any;
       const nodes: Record<string, any> = {};
       for (const id of Object.keys(nodesResp.nodes ?? {})) nodes[id] = nodesResp.nodes[id]?.document;
-      return text(stylesToTokens(styles, nodes));
+      return text(stylesToTokens(styles, nodes), staleNotice(client));
     }
   );
 

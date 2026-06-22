@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { FigmaClient } from "../figma-client.js";
-import { text } from "./util.js";
+import { text, staleNotice } from "./util.js";
 import { collapseNode } from "../components.js";
 import { resolveCodeConnect } from "../code-connect.js";
 import type { CodeConnectMap } from "../types.js";
@@ -25,7 +25,7 @@ export function registerReadTools(server: McpServer, client: FigmaClient, codeMa
         type: page.type,
         children: (page.children ?? []).map((f: any) => ({ id: f.id, name: f.name, type: f.type })),
       }));
-      return text({ name: file.name, lastModified: file.lastModified, pages });
+      return text({ name: file.name, lastModified: file.lastModified, pages }, staleNotice(client));
     }
   );
 
@@ -63,7 +63,7 @@ export function registerReadTools(server: McpServer, client: FigmaClient, codeMa
         attachCodeConnect(collapsed, componentsById, codeMap);
         out[id] = collapsed;
       }
-      return text(out);
+      return text(out, staleNotice(client));
     }
   );
 }
@@ -74,7 +74,8 @@ function attachCodeConnect(node: any, componentsById: Record<string, any>, codeM
   if (node.type === "INSTANCE" && node.componentId) {
     const key = componentsById[node.componentId]?.key;
     const entry = key ? codeMap[key] : undefined;
-    if (entry) node.codeConnect = resolveCodeConnect(entry, node.componentProperties ?? {});
+    // collapseNode always sets componentProperties (at least {}), so no fallback is needed here.
+    if (entry) node.codeConnect = resolveCodeConnect(entry, node.componentProperties);
     for (const c of node.slotContent ?? []) attachCodeConnect(c, componentsById, codeMap);
     return;
   }
